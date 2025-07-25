@@ -1,49 +1,45 @@
-
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { ObjectId } from "mongodb";
 
-// MongoDB Post interface
-export interface Post {
-  _id?: ObjectId;
-  id?: string;
-  title: string;
-  slug: string;
-  content: string;
-  excerpt?: string | null;
-  readTime?: string | null;
-  category?: string | null;
-  tags?: string[] | null;
-  status?: string;
-  viewCount?: number;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
+export const posts = pgTable("posts", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  content: text("content").notNull(),
+  excerpt: text("excerpt"),
+  readTime: text("read_time").default("5 min read"),
+  category: text("category").default("General"),
+  tags: text("tags").array().default([]),
+  status: text("status").default("published"), // published, draft
+  viewCount: integer("view_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
-// MongoDB Contact Submission interface
-export interface ContactSubmission {
-  _id?: ObjectId;
-  id?: string;
-  name: string;
-  email: string;
-  subject: string;
-  message: string;
-  createdAt?: Date;
-  isRead?: boolean;
-}
+export const contactSubmissions = pgTable("contact_submissions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  isRead: boolean("is_read").default(false),
+});
 
-export const insertPostSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  slug: z.string().min(1, "Slug is required"),
-  content: z.string().min(1, "Content is required"),
-  excerpt: z.string().optional(),
-  readTime: z.string().optional(),
-  category: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  status: z.string().optional(),
+export const insertPostSchema = createInsertSchema(posts).pick({
+  title: true,
+  slug: true,
+  content: true,
+  excerpt: true,
+  readTime: true,
+  category: true,
+  tags: true,
+  status: true,
 });
 
 export const updatePostSchema = insertPostSchema.extend({
-  id: z.string(),
+  id: z.number(),
 });
 
 export const contactSubmissionSchema = z.object({
@@ -53,5 +49,16 @@ export const contactSubmissionSchema = z.object({
   message: z.string().min(1, "Message is required"),
 });
 
+export type Post = typeof posts.$inferSelect;
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type UpdatePost = z.infer<typeof updatePostSchema>;
+
+export type ContactSubmission = {
+  id: number;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+};

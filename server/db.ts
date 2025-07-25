@@ -1,23 +1,18 @@
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
+import * as schema from "@shared/schema";
 
-import { MongoClient, Db } from 'mongodb';
+neonConfig.webSocketConstructor = ws;
 
-if (!process.env.MONGO_URI) {
+if (!process.env.DATABASE_URL) {
   throw new Error(
-    "MONGO_URI must be set. Did you forget to set the MongoDB connection string?",
+    "DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
-let client: MongoClient;
-let db: Db;
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle({ client: pool, schema });
 
-async function connectToDatabase() {
-  if (!client) {
-    client = new MongoClient(process.env.MONGO_URI!);
-    await client.connect();
-    db = client.db('blogDB');
-  }
-  return db;
-}
-
-export { connectToDatabase };
-export const getDb = () => db;
+// Export tables from shared schema for convenience
+export const { posts, contactSubmissions } = schema;

@@ -1,19 +1,20 @@
 import {
   type Post,
   type InsertPost,
-  type ContactSubmission,
 } from "@shared/schema";
 import fs from "fs/promises";
 import path from "path";
-import { connectToDatabase } from "./db";
-import { ObjectId } from "mongodb";
+import { db, posts, contactSubmissions } from "./db";
+import { eq, desc, like, and, sql } from "drizzle-orm";
+import type { ContactSubmission } from "@shared/schema";
 
 export interface IStorage {
+
   getAllPosts(): Promise<Post[]>;
   getPostBySlug(slug: string): Promise<Post | undefined>;
   createPost(post: InsertPost): Promise<Post>;
-  updatePost(id: string, post: Partial<InsertPost>): Promise<Post | undefined>;
-  deletePost(id: string): Promise<boolean>;
+  updatePost(id: number, post: Partial<InsertPost>): Promise<Post | undefined>;
+  deletePost(id: number): Promise<boolean>;
   incrementViewCount(slug: string): Promise<void>;
   getPostsByTag(tag: string): Promise<Post[]>;
   searchPosts(query: string): Promise<Post[]>;
@@ -28,17 +29,391 @@ export interface IStorage {
   }>;
 
   createContactSubmission(
-    data: Omit<ContactSubmission, "_id" | "id" | "createdAt" | "isRead">,
+    data: Omit<ContactSubmission, "id" | "createdAt" | "isRead">,
   ): Promise<ContactSubmission>;
   getAllContactSubmissions(): Promise<ContactSubmission[]>;
   markContactSubmissionAsRead(
-    id: string,
+    id: number,
   ): Promise<ContactSubmission | undefined>;
-  deleteContactSubmission(id: string): Promise<boolean>;
+  deleteContactSubmission(id: number): Promise<boolean>;
   getUnreadContactSubmissionsCount(): Promise<number>;
 }
 
-export class MongoStorage implements IStorage {
+export class MemStorage implements IStorage {
+  private posts: Map<number, Post>;
+  private currentPostId: number;
+  private postsDir: string;
+  private contactSubmissions: Map<number, ContactSubmission>;
+  private currentContactSubmissionId: number;
+
+  constructor() {
+    this.posts = new Map();
+    this.currentPostId = 1;
+    this.postsDir = path.join(process.cwd(), "posts");
+    this.contactSubmissions = new Map();
+    this.currentContactSubmissionId = 1;
+    this.initializeStorage();
+  }
+
+  private async initializeStorage() {
+    // Create posts directory if it doesn't exist
+    try {
+      await fs.mkdir(this.postsDir, { recursive: true });
+    } catch (error) {
+      // Directory already exists
+    }
+
+    // Load existing posts from markdown files
+    await this.loadPostsFromFiles();
+  }
+
+  private async loadPostsFromFiles() {
+    try {
+      const files = await fs.readdir(this.postsDir);
+      const markdownFiles = files.filter((file) => file.endsWith(".md"));
+
+      for (const file of markdownFiles) {
+        const filePath = path.join(this.postsDir, file);
+        const content = await fs.readFile(filePath, "utf-8");
+        const slug = file.replace(".md", "");
+
+        // Parse frontmatter and content
+        const { title, excerpt, readTime, category, tags, status, markdown } =
+          this.parseMarkdownFile(content);
+
+        const post: Post = {
+          id: this.currentPostId++,
+          title,
+          slug,
+          content: markdown,
+          excerpt,
+          readTime,
+          category,
+          tags,
+          status,
+          viewCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        this.posts.set(post.id, post);
+      }
+    } catch (error) {
+      console.error("Error loading posts from files:", error);
+    }
+  }
+
+  private parseMarkdownFile(content: string): {
+    title: string;
+    excerpt: string;
+    readTime: string;
+    category: string;
+    tags: string[];
+    status: string;
+    markdown: string;
+  } {
+    // Simple frontmatter parser
+    const lines = content.split("\n");
+    let title = "Untitled";
+    let excerpt = "";
+    let readTime = "5 min read";
+    let category = "General";
+    let tags: string[] = [];
+    let status = "published";
+    let markdown = content;
+
+    if (lines[0] === "---") {
+      const endIndex = lines.findIndex(
+        (line, index) => index > 0 && line === "---",
+      );
+      if (endIndex > 0) {
+        const frontmatter = lines.slice(1, endIndex);
+        markdown = lines.slice(endIndex + 1).join("\n");
+
+        frontmatter.forEach((line) => {
+          const [key, ...valueParts] = line.split(":");
+          const value = valueParts.join(":").trim();
+
+          switch (key.trim()) {
+            case "title":
+              title = value;
+              break;
+            case "excerpt":
+              excerpt = value;
+              break;
+            case "readTime":
+              readTime = value;
+              break;
+            case "category":
+              category = value;
+              break;
+            case "tags":
+              tags = value
+                .split(",")
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0);
+              break;
+            case "status":
+              status = value;
+              break;
+          }
+        });
+      }
+    }
+
+    // Generate excerpt from content if not provided
+    if (!excerpt) {
+      const firstParagraph = markdown
+        .split("\n")
+        .find((line) => line.trim().length > 0);
+      excerpt = firstParagraph ? firstParagraph.substring(0, 150) + "..." : "";
+    }
+
+    return { title, excerpt, readTime, category, tags, status, markdown };
+  }
+
+  private async savePostToFile(post: Post) {
+    const frontmatter = `---
+title: ${post.title}
+excerpt: ${post.excerpt}
+readTime: ${post.readTime}
+category: ${post.category}
+tags: ${post.tags?.join(", ") || ""}
+status: ${post.status}
+---
+
+${post.content}`;
+
+    const filePath = path.join(this.postsDir, `${post.slug}.md`);
+    await fs.writeFile(filePath, frontmatter, "utf-8");
+  }
+
+  private async deletePostFile(slug: string) {
+    const filePath = path.join(this.postsDir, `${slug}.md`);
+    try {
+      await fs.unlink(filePath);
+    } catch (error) {
+      console.error("Error deleting post file:", error);
+    }
+  }
+
+  
+
+  async getAllPosts(): Promise<Post[]> {
+    return Array.from(this.posts.values())
+      .filter((post) => post.status === "published")
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || new Date()).getTime() -
+          new Date(a.createdAt || new Date()).getTime(),
+      );
+  }
+
+  async getPostBySlug(slug: string): Promise<Post | undefined> {
+    return Array.from(this.posts.values()).find((post) => post.slug === slug);
+  }
+
+  async createPost(insertPost: InsertPost): Promise<Post> {
+    const id = this.currentPostId++;
+    const post: Post = {
+      title: insertPost.title,
+      slug: insertPost.slug,
+      content: insertPost.content,
+      excerpt: insertPost.excerpt || null,
+      readTime: insertPost.readTime || null,
+      category: insertPost.category || null,
+      tags: insertPost.tags || null,
+      status: insertPost.status || "published",
+      viewCount: 0,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    this.posts.set(id, post);
+    await this.savePostToFile(post);
+    return post;
+  }
+
+  async updatePost(
+    id: number,
+    updateData: Partial<InsertPost>,
+  ): Promise<Post | undefined> {
+    const existingPost = this.posts.get(id);
+    if (!existingPost) return undefined;
+
+    const updatedPost: Post = {
+      ...existingPost,
+      ...updateData,
+      updatedAt: new Date(),
+    };
+
+    this.posts.set(id, updatedPost);
+    await this.savePostToFile(updatedPost);
+    return updatedPost;
+  }
+
+  async deletePost(id: number): Promise<boolean> {
+    const post = this.posts.get(id);
+    if (!post) return false;
+
+    this.posts.delete(id);
+    await this.deletePostFile(post.slug);
+    return true;
+  }
+
+  async incrementViewCount(slug: string): Promise<void> {
+    const post = Array.from(this.posts.values()).find((p) => p.slug === slug);
+    if (post) {
+      post.viewCount = (post.viewCount || 0) + 1;
+      await this.savePostToFile(post);
+    }
+  }
+
+  async getPostsByTag(tag: string): Promise<Post[]> {
+    return Array.from(this.posts.values())
+      .filter((post) => post.status === "published" && post.tags?.includes(tag))
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || new Date()).getTime() -
+          new Date(a.createdAt || new Date()).getTime(),
+      );
+  }
+
+  async searchPosts(query: string): Promise<Post[]> {
+    const searchTerm = query.toLowerCase();
+    return Array.from(this.posts.values())
+      .filter(
+        (post) =>
+          post.status === "published" &&
+          (post.title.toLowerCase().includes(searchTerm) ||
+            post.content.toLowerCase().includes(searchTerm) ||
+            post.excerpt?.toLowerCase().includes(searchTerm)),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || new Date()).getTime() -
+          new Date(a.createdAt || new Date()).getTime(),
+      );
+  }
+
+  async getPostStats(): Promise<{
+    totalPosts: number;
+    publishedPosts: number;
+    draftPosts: number;
+    thisMonthPosts: number;
+    totalViews: number;
+    topPosts: Post[];
+    tagDistribution: { [key: string]: number };
+  }> {
+    const allPosts = Array.from(this.posts.values());
+    const publishedPosts = allPosts.filter((p) => p.status === "published");
+    const draftPosts = allPosts.filter((p) => p.status === "draft");
+
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthPosts = allPosts.filter(
+      (p) => p.createdAt && new Date(p.createdAt) >= thisMonth,
+    );
+
+    const totalViews = allPosts.reduce(
+      (sum, post) => sum + (post.viewCount || 0),
+      0,
+    );
+
+    const topPosts = [...publishedPosts]
+      .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
+      .slice(0, 5);
+
+    const tagDistribution: { [key: string]: number } = {};
+    publishedPosts.forEach((post) => {
+      post.tags?.forEach((tag) => {
+        tagDistribution[tag] = (tagDistribution[tag] || 0) + 1;
+      });
+    });
+
+    return {
+      totalPosts: allPosts.length,
+      publishedPosts: publishedPosts.length,
+      draftPosts: draftPosts.length,
+      thisMonthPosts: thisMonthPosts.length,
+      totalViews,
+      topPosts,
+      tagDistribution,
+    };
+  }
+
+  async createContactSubmission(
+    data: Omit<ContactSubmission, "id" | "createdAt" | "isRead">,
+  ): Promise<ContactSubmission> {
+    const [submission] = await db.insert(contactSubmissions).values({
+      name: data.name,
+      email: data.email,
+      subject: data.subject,
+      message: data.message,
+    }).returning();
+    
+    return {
+      id: submission.id,
+      name: submission.name,
+      email: submission.email,
+      subject: submission.subject,
+      message: submission.message,
+      createdAt: submission.createdAt?.toISOString() || new Date().toISOString(),
+      isRead: submission.isRead || false,
+    };
+  }
+
+  async getAllContactSubmissions(): Promise<ContactSubmission[]> {
+    const submissions = await db.select().from(contactSubmissions).orderBy(desc(contactSubmissions.createdAt));
+    return submissions.map(sub => ({
+      id: sub.id,
+      name: sub.name,
+      email: sub.email,
+      subject: sub.subject,
+      message: sub.message,
+      createdAt: sub.createdAt?.toISOString() || new Date().toISOString(),
+      isRead: sub.isRead || false,
+    }));
+  }
+
+  async markContactSubmissionAsRead(
+    id: number,
+  ): Promise<ContactSubmission | undefined> {
+    const [updated] = await db.update(contactSubmissions)
+      .set({ isRead: true })
+      .where(eq(contactSubmissions.id, id))
+      .returning();
+    
+    if (updated) {
+      return {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        subject: updated.subject,
+        message: updated.message,
+        createdAt: updated.createdAt?.toISOString() || new Date().toISOString(),
+        isRead: updated.isRead || false,
+      };
+    }
+    return undefined;
+  }
+
+  async deleteContactSubmission(id: number): Promise<boolean> {
+    const result = await db.delete(contactSubmissions)
+      .where(eq(contactSubmissions.id, id));
+    return result.rowCount > 0;
+  }
+
+  async getUnreadContactSubmissionsCount(): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` })
+      .from(contactSubmissions)
+      .where(eq(contactSubmissions.isRead, false));
+    return result.count;
+  }
+}
+
+export class DatabaseStorage implements IStorage {
   private postsDir: string;
 
   constructor() {
@@ -48,7 +423,6 @@ export class MongoStorage implements IStorage {
 
   private async initializeStorage() {
     try {
-      await connectToDatabase();
       await this.loadPostsFromFiles();
     } catch (error) {
       console.error("Error initializing storage:", error);
@@ -59,8 +433,6 @@ export class MongoStorage implements IStorage {
     try {
       const files = await fs.readdir(this.postsDir);
       const markdownFiles = files.filter((file) => file.endsWith(".md"));
-      const db = await connectToDatabase();
-      const postsCollection = db.collection("posts");
 
       for (const file of markdownFiles) {
         const filePath = path.join(this.postsDir, file);
@@ -68,11 +440,15 @@ export class MongoStorage implements IStorage {
         const slug = file.replace(".md", "");
 
         // Check if post already exists in database
-        const existingPost = await postsCollection.findOne({ slug });
+        const existingPost = await db
+          .select()
+          .from(posts)
+          .where(eq(posts.slug, slug))
+          .limit(1);
 
-        if (!existingPost) {
+        if (existingPost.length === 0) {
           const parsed = this.parseMarkdownFile(content);
-          const post = {
+          const post: InsertPost = {
             title: parsed.title,
             slug: slug,
             content: parsed.markdown,
@@ -80,13 +456,13 @@ export class MongoStorage implements IStorage {
             readTime: parsed.readTime,
             category: parsed.category,
             tags: parsed.tags,
-            status: parsed.status,
+            status: parsed.status as "published" | "draft",
             viewCount: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
           };
 
-          await postsCollection.insertOne(post);
+          await db.insert(posts).values(post);
         }
       }
     } catch (error) {
@@ -173,118 +549,81 @@ ${post.content}`;
     }
   }
 
-  private convertPostForResponse(post: any): Post {
-    return {
-      ...post,
-      id: post._id.toString(),
-      createdAt: post.createdAt,
-      updatedAt: post.updatedAt,
-    };
-  }
+  
 
   async getAllPosts(): Promise<Post[]> {
-    const db = await connectToDatabase();
-    const posts = await db.collection("posts")
-      .find({ status: "published" })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    return posts.map(this.convertPostForResponse);
+    return await db.select().from(posts).orderBy(desc(posts.createdAt));
   }
 
   async getPostBySlug(slug: string): Promise<Post | undefined> {
-    const db = await connectToDatabase();
-    const post = await db.collection("posts").findOne({ slug });
-    return post ? this.convertPostForResponse(post) : undefined;
+    const [post] = await db.select().from(posts).where(eq(posts.slug, slug));
+    return post || undefined;
   }
 
   async createPost(insertPost: InsertPost): Promise<Post> {
-    const db = await connectToDatabase();
-    const postData = {
-      ...insertPost,
-      viewCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const result = await db.collection("posts").insertOne(postData);
-    const post = { ...postData, _id: result.insertedId };
-    await this.savePostToFile(this.convertPostForResponse(post));
-    return this.convertPostForResponse(post);
+    const [post] = await db.insert(posts).values(insertPost).returning();
+    await this.savePostToFile(post);
+    return post;
   }
 
   async updatePost(
-    id: string,
+    id: number,
     updateData: Partial<InsertPost>,
   ): Promise<Post | undefined> {
-    const db = await connectToDatabase();
-    const result = await db.collection("posts").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { 
-        $set: { 
-          ...updateData, 
-          updatedAt: new Date() 
-        } 
-      },
-      { returnDocument: "after" }
-    );
-
-    if (result) {
-      const post = this.convertPostForResponse(result);
+    const [post] = await db
+      .update(posts)
+      .set(updateData)
+      .where(eq(posts.id, id))
+      .returning();
+    if (post) {
       await this.savePostToFile(post);
-      return post;
     }
-    return undefined;
+    return post || undefined;
   }
 
-  async deletePost(id: string): Promise<boolean> {
-    const db = await connectToDatabase();
-    const post = await db.collection("posts").findOne({ _id: new ObjectId(id) });
-
-    if (post) {
-      await this.deletePostFile(post.slug);
-      const result = await db.collection("posts").deleteOne({ _id: new ObjectId(id) });
-      return result.deletedCount > 0;
+  async deletePost(id: number): Promise<boolean> {
+    const post = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
+    if (post.length > 0) {
+      await this.deletePostFile(post[0].slug);
+      await db.delete(posts).where(eq(posts.id, id));
+      return true;
     }
     return false;
   }
 
   async incrementViewCount(slug: string): Promise<void> {
-    const db = await connectToDatabase();
-    await db.collection("posts").updateOne(
-      { slug },
-      { $inc: { viewCount: 1 } }
-    );
+    await db
+      .update(posts)
+      .set({
+        viewCount: sql`${posts.viewCount} + 1`,
+      })
+      .where(eq(posts.slug, slug));
   }
 
   async getPostsByTag(tag: string): Promise<Post[]> {
-    const db = await connectToDatabase();
-    const posts = await db.collection("posts")
-      .find({ 
-        status: "published",
-        tags: tag 
-      })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    return posts.map(this.convertPostForResponse);
+    return await db
+      .select()
+      .from(posts)
+      .where(
+        and(
+          sql`${posts.tags} @> ARRAY[${tag}]::text[]`,
+          eq(posts.status, "published"),
+        ),
+      )
+      .orderBy(desc(posts.createdAt));
   }
 
   async searchPosts(query: string): Promise<Post[]> {
-    const db = await connectToDatabase();
-    const posts = await db.collection("posts")
-      .find({
-        status: "published",
-        $or: [
-          { title: { $regex: query, $options: "i" } },
-          { content: { $regex: query, $options: "i" } },
-          { excerpt: { $regex: query, $options: "i" } }
-        ]
-      })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    return posts.map(this.convertPostForResponse);
+    return await db
+      .select()
+      .from(posts)
+      .where(
+        and(
+          sql`(${posts.title} ILIKE ${"%" + query + "%"} OR ${posts.content} ILIKE ${"%" + query + "%"})`,
+          eq(posts.status, "published"),
+        ),
+      )
+      .orderBy(desc(posts.createdAt));
   }
 
   async getPostStats(): Promise<{
@@ -296,9 +635,7 @@ ${post.content}`;
     topPosts: Post[];
     tagDistribution: { [key: string]: number };
   }> {
-    const db = await connectToDatabase();
-    const allPosts = await db.collection("posts").find({}).toArray();
-
+    const allPosts = await db.select().from(posts);
     const publishedPosts = allPosts.filter((p) => p.status === "published");
     const draftPosts = allPosts.filter((p) => p.status === "draft");
 
@@ -315,13 +652,12 @@ ${post.content}`;
 
     const topPosts = publishedPosts
       .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-      .slice(0, 5)
-      .map(this.convertPostForResponse);
+      .slice(0, 5);
 
     const tagDistribution: { [key: string]: number } = {};
     allPosts.forEach((post) => {
       if (post.tags) {
-        post.tags.forEach((tag: string) => {
+        post.tags.forEach((tag) => {
           tagDistribution[tag] = (tagDistribution[tag] || 0) + 1;
         });
       }
@@ -339,62 +675,81 @@ ${post.content}`;
   }
 
   async createContactSubmission(
-    data: Omit<ContactSubmission, "_id" | "id" | "createdAt" | "isRead">,
+    data: Omit<ContactSubmission, "id" | "createdAt" | "isRead">,
   ): Promise<ContactSubmission> {
-    const db = await connectToDatabase();
-    const submissionData = {
-      ...data,
-      createdAt: new Date(),
-      isRead: false,
-    };
+    try {
+      const [result] = await db
+        .insert(contactSubmissions)
+        .values({
+          name: data.name,
+          email: data.email,
+          subject: data.subject,
+          message: data.message,
+          createdAt: new Date(),
+          isRead: false,
+        })
+        .returning();
 
-    const result = await db.collection("contactSubmissions").insertOne(submissionData);
-    return {
-      ...submissionData,
-      id: result.insertedId.toString(),
-    };
+      return result;
+    } catch (error) {
+      console.error("Error creating contact submission:", error);
+      throw new Error("Failed to create contact submission");
+    }
   }
 
   async getAllContactSubmissions(): Promise<ContactSubmission[]> {
-    const db = await connectToDatabase();
-    const submissions = await db.collection("contactSubmissions")
-      .find({})
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    return submissions.map(sub => ({
-      ...sub,
-      id: sub._id.toString(),
-    }));
+    try {
+      return await db
+        .select()
+        .from(contactSubmissions)
+        .orderBy(desc(contactSubmissions.createdAt));
+    } catch (error) {
+      console.error("Error fetching contact submissions:", error);
+      throw new Error("Failed to fetch contact submissions");
+    }
   }
 
   async markContactSubmissionAsRead(
-    id: string,
+    id: number,
   ): Promise<ContactSubmission | undefined> {
-    const db = await connectToDatabase();
-    const result = await db.collection("contactSubmissions").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $set: { isRead: true } },
-      { returnDocument: "after" }
-    );
+    const [result] = await db
+      .update(contactSubmissions)
+      .set({ isRead: true })
+      .where(eq(contactSubmissions.id, id))
+      .returning();
 
-    return result ? { ...result, id: result._id.toString() } : undefined;
+    return result || undefined;
   }
 
-  async deleteContactSubmission(id: string): Promise<boolean> {
-    const db = await connectToDatabase();
-    const result = await db.collection("contactSubmissions").deleteOne({ 
-      _id: new ObjectId(id) 
-    });
-    return result.deletedCount > 0;
+  async deleteContactSubmission(id: number): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(contactSubmissions)
+        .where(eq(contactSubmissions.id, id));
+
+      return (result as any).rowCount > 0;
+    } catch (error) {
+      console.error("Error deleting contact submission:", error);
+      throw new Error("Failed to delete contact submission");
+    }
   }
 
   async getUnreadContactSubmissionsCount(): Promise<number> {
-    const db = await connectToDatabase();
-    return await db.collection("contactSubmissions").countDocuments({ 
-      isRead: false 
-    });
+    try {
+      const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(contactSubmissions)
+        .where(eq(contactSubmissions.isRead, false));
+
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error("Error fetching unread contact submissions count:", error);
+      throw new Error("Failed to fetch unread contact submissions count");
+    }
   }
 }
 
-export const storage = new MongoStorage();
+
+
+
+export const storage = new DatabaseStorage();
