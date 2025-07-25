@@ -104,52 +104,52 @@ export default function BlogPost() {
         {/* Main Content */}
         <div className="flex-1 max-w-4xl">
           {/* Post Header */}
-          <div className="mb-8"></div>
-        <div className="flex items-center mb-4">
-          <Link href="/">
-            <Button variant="ghost" className="text-blue-600 hover:text-blue-800">
-              <ArrowLeft className="mr-2" size={16} />
-              Back to Home
-            </Button>
-          </Link>
-        </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">
-          {post.title}
-        </h1>
-        <div className="flex flex-wrap items-center text-slate-600 mb-6 gap-2">
-          <span>
-            {new Date(post.createdAt || new Date()).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-          </span>
-          <span className="mx-2">•</span>
-          <div className="flex items-center">
-            <Clock className="mr-1" size={16} />
-            <span>{post.readTime}</span>
-          </div>
-          <span className="mx-2">•</span>
-          <span>{post.category}</span>
-          <span className="mx-2">•</span>
-          <div className="flex items-center">
-            <Eye className="mr-1" size={16} />
-            <span>{post.viewCount || 0} views</span>
-          </div>
-        </div>
+          <div className="mb-8">
+            <div className="flex items-center mb-4">
+              <Link href="/">
+                <Button variant="ghost" className="text-blue-600 hover:text-blue-800">
+                  <ArrowLeft className="mr-2" size={16} />
+                  Back to Home
+                </Button>
+              </Link>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">
+              {post.title}
+            </h1>
+            <div className="flex flex-wrap items-center text-slate-600 mb-6 gap-2">
+              <span>
+                {new Date(post.createdAt || new Date()).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </span>
+              <span className="mx-2">•</span>
+              <div className="flex items-center">
+                <Clock className="mr-1" size={16} />
+                <span>{post.readTime}</span>
+              </div>
+              <span className="mx-2">•</span>
+              <span>{post.category}</span>
+              <span className="mx-2">•</span>
+              <div className="flex items-center">
+                <Eye className="mr-1" size={16} />
+                <span>{post.viewCount || 0} views</span>
+              </div>
+            </div>
 
-        {/* Tags */}
-        {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            {post.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                <Tag size={12} />
-                {tag}
-              </Badge>
-            ))}
+            {/* Tags */}
+            {post.tags && post.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {post.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                    <Tag size={12} />
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
       {/* Google AdSense Ad - Top of content */}
       <Card className="mb-8 bg-slate-50 border-slate-200">
