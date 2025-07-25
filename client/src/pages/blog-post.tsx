@@ -57,9 +57,54 @@ export default function BlogPost() {
   const renderedContent = renderMarkdown(post.content);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Post Header */}
-      <div className="mb-8">
+    <div className="relative">
+      {/* Floating Ad - Bottom Right (Desktop only) */}
+      <div className="fixed bottom-4 right-4 z-50 hidden lg:block">
+        <Card className="w-64 bg-white border-2 border-slate-300 shadow-lg">
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-slate-500 mb-2">Advertisement</p>
+            <button 
+              className="absolute top-1 right-1 text-slate-400 hover:text-slate-600 text-xs w-4 h-4 flex items-center justify-center"
+              onClick={(e) => e.currentTarget.parentElement?.parentElement?.classList.add('hidden')}
+            >
+              ×
+            </button>
+            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+            <ins className="adsbygoogle block w-full"
+                 style={{display: 'block', minHeight: '200px'}}
+                 data-ad-client="ca-pub-xxxxxxxxxx"
+                 data-ad-slot="xxxxxxxxxx"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+            <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="max-w-7xl mx-auto flex gap-6">
+        {/* Left Sidebar Ad (Desktop only) */}
+        <div className="hidden xl:block w-64 flex-shrink-0">
+          <div className="sticky top-20">
+            <Card className="bg-slate-50 border-slate-200">
+              <CardContent className="p-4 text-center">
+                <p className="text-xs text-slate-500 mb-4">Advertisement</p>
+                <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+                <ins className="adsbygoogle block w-full"
+                     style={{display: 'block', minHeight: '600px'}}
+                     data-ad-client="ca-pub-xxxxxxxxxx"
+                     data-ad-slot="xxxxxxxxxx"
+                     data-ad-format="auto"
+                     data-full-width-responsive="true"></ins>
+                <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 max-w-4xl">
+          {/* Post Header */}
+          <div className="mb-8"></div>
         <div className="flex items-center mb-4">
           <Link href="/">
             <Button variant="ghost" className="text-blue-600 hover:text-blue-800">
@@ -161,16 +206,52 @@ export default function BlogPost() {
       </Card>
 
       {/* Comments Section */}
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="text-xl font-bold text-slate-800 mb-4">Comments</h3>
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">
-            <div className="text-slate-400 text-2xl mb-2">💬</div>
-            <p className="text-slate-600">Comments feature would be implemented here</p>
-            <p className="text-slate-500 text-sm">Consider using a service like Disqus or building a custom solution</p>
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="text-xl font-bold text-slate-800 mb-4">Comments</h3>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">
+                <div className="text-slate-400 text-2xl mb-2">💬</div>
+                <p className="text-slate-600">Comments feature would be implemented here</p>
+                <p className="text-slate-500 text-sm">Consider using a service like Disqus or building a custom solution</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Sidebar Ad (Desktop only) */}
+        <div className="hidden xl:block w-64 flex-shrink-0">
+          <div className="sticky top-20">
+            <Card className="bg-slate-50 border-slate-200">
+              <CardContent className="p-4 text-center">
+                <p className="text-xs text-slate-500 mb-4">Advertisement</p>
+                <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+                <ins className="adsbygoogle block w-full"
+                     style={{display: 'block', minHeight: '600px'}}
+                     data-ad-client="ca-pub-xxxxxxxxxx"
+                     data-ad-slot="xxxxxxxxxx"
+                     data-ad-format="auto"
+                     data-full-width-responsive="true"></ins>
+                <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+              </CardContent>
+            </Card>
+
+            {/* Additional Right Sidebar Ad */}
+            <Card className="bg-slate-50 border-slate-200 mt-6">
+              <CardContent className="p-4 text-center">
+                <p className="text-xs text-slate-500 mb-4">Advertisement</p>
+                <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+                <ins className="adsbygoogle block w-full"
+                     style={{display: 'block', minHeight: '300px'}}
+                     data-ad-client="ca-pub-xxxxxxxxxx"
+                     data-ad-slot="xxxxxxxxxx"
+                     data-ad-format="auto"
+                     data-full-width-responsive="true"></ins>
+                <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
