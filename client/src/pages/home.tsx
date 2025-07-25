@@ -170,6 +170,23 @@ export default function Home() {
         </Card>
       )}
 
+      {/* Google AdSense Ad - Top of Recent Posts */}
+      <div className="mb-8">
+        <Card className="bg-slate-50 border-slate-200">
+          <CardContent className="p-6 text-center">
+            <p className="text-xs text-slate-500 mb-4">Advertisement</p>
+            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+            <ins className="adsbygoogle block w-full"
+                 style={{display: 'block'}}
+                 data-ad-client="ca-pub-xxxxxxxxxx"
+                 data-ad-slot="xxxxxxxxxx"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+            <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Recent Posts */}
       <div className="mb-12">
         <h2 className="text-3xl font-bold text-slate-800 mb-8">Recent Posts</h2>
@@ -228,6 +245,23 @@ export default function Home() {
             </Card>
           ))}
         </div>
+      </div>
+
+      {/* Google AdSense Ad - Middle of page */}
+      <div className="mb-12">
+        <Card className="bg-slate-50 border-slate-200">
+          <CardContent className="p-6 text-center">
+            <p className="text-xs text-slate-500 mb-4">Advertisement</p>
+            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+            <ins className="adsbygoogle block w-full"
+                 style={{display: 'block'}}
+                 data-ad-client="ca-pub-xxxxxxxxxx"
+                 data-ad-slot="xxxxxxxxxx"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+            <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Newsletter Signup */}

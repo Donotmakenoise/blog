@@ -106,6 +106,21 @@ export default function BlogPost() {
         )}
       </div>
 
+      {/* Google AdSense Ad - Top of content */}
+      <Card className="mb-8 bg-slate-50 border-slate-200">
+        <CardContent className="p-6 text-center">
+          <p className="text-xs text-slate-500 mb-4">Advertisement</p>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+          <ins className="adsbygoogle block w-full"
+               style={{display: 'block'}}
+               data-ad-client="ca-pub-xxxxxxxxxx"
+               data-ad-slot="xxxxxxxxxx"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+          <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+        </CardContent>
+      </Card>
+
       {/* Post Content */}
       <Card className="mb-8">
         <CardContent className="p-8">
@@ -130,7 +145,7 @@ export default function BlogPost() {
             dangerouslySetInnerHTML={{ __html: renderedContent }}
           />
           
-          {/* Google AdSense Ad */}
+          {/* Google AdSense Ad - Bottom of content */}
           <div className="mt-8 p-4 bg-slate-50 border border-slate-200 rounded-lg">
             <p className="text-xs text-slate-500 mb-2 text-center">Advertisement</p>
             <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
