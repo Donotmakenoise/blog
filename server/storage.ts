@@ -184,7 +184,8 @@ ${post.content}`;
 
   async getAllPosts(): Promise<Post[]> {
     const db = await connectToDatabase();
-    const posts = await db.collection("posts")
+    const posts = await db
+      .collection("posts")
       .find({ status: "published" })
       .sort({ createdAt: -1 })
       .toArray();
@@ -220,13 +221,13 @@ ${post.content}`;
     const db = await connectToDatabase();
     const result = await db.collection("posts").findOneAndUpdate(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
-          ...updateData, 
-          updatedAt: new Date() 
-        } 
+      {
+        $set: {
+          ...updateData,
+          updatedAt: new Date(),
+        },
       },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     );
 
     if (result) {
@@ -239,11 +240,15 @@ ${post.content}`;
 
   async deletePost(id: string): Promise<boolean> {
     const db = await connectToDatabase();
-    const post = await db.collection("posts").findOne({ _id: new ObjectId(id) });
+    const post = await db
+      .collection("posts")
+      .findOne({ _id: new ObjectId(id) });
 
     if (post) {
       await this.deletePostFile(post.slug);
-      const result = await db.collection("posts").deleteOne({ _id: new ObjectId(id) });
+      const result = await db
+        .collection("posts")
+        .deleteOne({ _id: new ObjectId(id) });
       return result.deletedCount > 0;
     }
     return false;
@@ -251,18 +256,18 @@ ${post.content}`;
 
   async incrementViewCount(slug: string): Promise<void> {
     const db = await connectToDatabase();
-    await db.collection("posts").updateOne(
-      { slug },
-      { $inc: { viewCount: 1 } }
-    );
+    await db
+      .collection("posts")
+      .updateOne({ slug }, { $inc: { viewCount: 1 } });
   }
 
   async getPostsByTag(tag: string): Promise<Post[]> {
     const db = await connectToDatabase();
-    const posts = await db.collection("posts")
-      .find({ 
+    const posts = await db
+      .collection("posts")
+      .find({
         status: "published",
-        tags: tag 
+        tags: tag,
       })
       .sort({ createdAt: -1 })
       .toArray();
@@ -272,14 +277,15 @@ ${post.content}`;
 
   async searchPosts(query: string): Promise<Post[]> {
     const db = await connectToDatabase();
-    const posts = await db.collection("posts")
+    const posts = await db
+      .collection("posts")
       .find({
         status: "published",
         $or: [
           { title: { $regex: query, $options: "i" } },
           { content: { $regex: query, $options: "i" } },
-          { excerpt: { $regex: query, $options: "i" } }
-        ]
+          { excerpt: { $regex: query, $options: "i" } },
+        ],
       })
       .sort({ createdAt: -1 })
       .toArray();
@@ -348,7 +354,9 @@ ${post.content}`;
       isRead: false,
     };
 
-    const result = await db.collection("contactSubmissions").insertOne(submissionData);
+    const result = await db
+      .collection("contactSubmissions")
+      .insertOne(submissionData);
     return {
       ...submissionData,
       id: result.insertedId.toString(),
@@ -357,12 +365,13 @@ ${post.content}`;
 
   async getAllContactSubmissions(): Promise<ContactSubmission[]> {
     const db = await connectToDatabase();
-    const submissions = await db.collection("contactSubmissions")
+    const submissions = await db
+      .collection("contactSubmissions")
       .find({})
       .sort({ createdAt: -1 })
       .toArray();
 
-    return submissions.map(sub => ({
+    return submissions.map((sub) => ({
       ...sub,
       id: sub._id.toString(),
     }));
@@ -372,27 +381,29 @@ ${post.content}`;
     id: string,
   ): Promise<ContactSubmission | undefined> {
     const db = await connectToDatabase();
-    const result = await db.collection("contactSubmissions").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $set: { isRead: true } },
-      { returnDocument: "after" }
-    );
+    const result = await db
+      .collection("contactSubmissions")
+      .findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: { isRead: true } },
+        { returnDocument: "after" },
+      );
 
     return result ? { ...result, id: result._id.toString() } : undefined;
   }
 
   async deleteContactSubmission(id: string): Promise<boolean> {
     const db = await connectToDatabase();
-    const result = await db.collection("contactSubmissions").deleteOne({ 
-      _id: new ObjectId(id) 
+    const result = await db.collection("contactSubmissions").deleteOne({
+      _id: new ObjectId(id),
     });
     return result.deletedCount > 0;
   }
 
   async getUnreadContactSubmissionsCount(): Promise<number> {
     const db = await connectToDatabase();
-    return await db.collection("contactSubmissions").countDocuments({ 
-      isRead: false 
+    return await db.collection("contactSubmissions").countDocuments({
+      isRead: false,
     });
   }
 }

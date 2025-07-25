@@ -1,8 +1,16 @@
 modules = ["nodejs-20", "web"]
 run = "npm run dev"
 
+[env]
+MONGO_URI = "mongodb+srv://blog:blogger124@blogdb.jazzmab.mongodb.net/?retryWrites=true&w=majority&appName=blogDB"
+
+
 [nix]
 channel = "stable-25_05"
 
 [deployment]
 run = ["sh", "-c", "npm run dev"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
