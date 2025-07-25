@@ -124,10 +124,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const postData = updatePostSchema.parse({
         ...req.body,
-        id: parseInt(id),
+        id: id,
       });
 
-      const updatedPost = await storage.updatePost(parseInt(id), postData);
+      const updatedPost = await storage.updatePost(id, postData);
 
       if (!updatedPost) {
         return res.status(404).json({ error: "Post not found" });
@@ -149,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/posts/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const success = await storage.deletePost(parseInt(id));
+      const success = await storage.deletePost(id);
 
       if (!success) {
         return res.status(404).json({ error: "Post not found" });
@@ -209,9 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/contact-submissions/:id/read", async (req, res) => {
     try {
       const { id } = req.params;
-      const submission = await storage.markContactSubmissionAsRead(
-        parseInt(id),
-      );
+      const submission = await storage.markContactSubmissionAsRead(id);
 
       if (!submission) {
         return res.status(404).json({ error: "Contact submission not found" });
@@ -227,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/contact-submissions/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const success = await storage.deleteContactSubmission(parseInt(id));
+      const success = await storage.deleteContactSubmission(id);
 
       if (!success) {
         return res.status(404).json({ error: "Contact submission not found" });
