@@ -570,67 +570,160 @@ export default function Admin() {
                 )}
               </CardTitle>
               <p className="text-slate-600 text-sm">Manage incoming contact form submissions</p>
+              
+              {/* Message Search and Filters */}
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+                  <Input
+                    placeholder="Search messages by name, email, subject, or content..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Filter messages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Messages</SelectItem>
+                    <SelectItem value="unread">Unread Only</SelectItem>
+                    <SelectItem value="read">Read Only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="oldest">Oldest First</SelectItem>
+                    <SelectItem value="unread">Unread First</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {contactSubmissions?.map((submission) => (
-                  <div 
+                {contactSubmissions?.filter(submission => {
+                  const matchesSearch = !searchTerm || 
+                    submission.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    submission.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    submission.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    submission.message.toLowerCase().includes(searchTerm.toLowerCase());
+                  
+                  const matchesStatus = statusFilter === "all" || 
+                    (statusFilter === "unread" && !submission.isRead) ||
+                    (statusFilter === "read" && submission.isRead);
+                  
+                  return matchesSearch && matchesStatus;
+                }).sort((a, b) => {
+                  switch (sortBy) {
+                    case "oldest":
+                      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                    case "unread":
+                      return (a.isRead ? 1 : 0) - (b.isRead ? 1 : 0);
+                    default: // newest
+                      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  }
+                }).map((submission) => (
+                  <Card 
                     key={submission.id} 
-                    className={`p-4 border rounded-lg transition-colors ${
-                      !submission.isRead ? 'bg-blue-50 border-blue-200 shadow-sm' : 'border-slate-200 hover:bg-slate-50'
+                    className={`transition-all duration-200 ${
+                      !submission.isRead ? 'bg-blue-50 border-blue-200 shadow-md' : 'hover:shadow-sm'
                     }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-3">
-                          <h3 className="font-medium text-slate-800">{submission.subject}</h3>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${!submission.isRead ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                          <div>
+                            <h3 className="font-semibold text-slate-800 text-lg">{submission.subject}</h3>
+                            <div className="flex items-center gap-2 text-sm text-slate-600 mt-1">
+                              <span className="font-medium">{submission.name}</span>
+                              <span>•</span>
+                              <span className="text-blue-600">{submission.email}</span>
+                              <span>•</span>
+                              <div className="flex items-center">
+                                <Clock size={12} className="mr-1" />
+                                {new Date(submission.createdAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
                           {!submission.isRead && (
-                            <Badge variant="destructive" className="text-xs">
+                            <Badge variant="destructive" className="text-xs animate-pulse">
                               New
                             </Badge>
                           )}
-                        </div>
-                        <div className="bg-white p-3 rounded border border-slate-100 mb-3">
-                          <p className="text-sm text-slate-600 mb-2">
-                            <strong>From:</strong> {submission.name} ({submission.email})
-                          </p>
-                          <p className="text-sm text-slate-700">{submission.message}</p>
-                        </div>
-                        <div className="flex items-center text-xs text-slate-500">
-                          <Clock size={12} className="mr-1" />
-                          {new Date(submission.createdAt).toLocaleString()}
+                          <div className="flex gap-2">
+                            {!submission.isRead && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => markAsReadMutation.mutate(submission.id)}
+                                disabled={markAsReadMutation.isPending}
+                                className="hover:bg-green-50 hover:border-green-300"
+                              >
+                                <CheckCircle size={14} className="mr-1" />
+                                Mark Read
+                              </Button>
+                            )}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteContactMutation.mutate(submission.id)}
+                              disabled={deleteContactMutation.isPending}
+                            >
+                              <Trash2 size={14} className="mr-1" />
+                              Delete
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex gap-2 ml-4">
-                        {!submission.isRead && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => markAsReadMutation.mutate(submission.id)}
-                            disabled={markAsReadMutation.isPending}
-                          >
-                            <CheckCircle size={14} className="mr-1" />
-                            Mark as Read
-                          </Button>
-                        )}
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteContactMutation.mutate(submission.id)}
-                          disabled={deleteContactMutation.isPending}
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          Delete
-                        </Button>
+                      
+                      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                        <div className="prose prose-sm max-w-none">
+                          <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{submission.message}</p>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                      
+                      {!submission.isRead && (
+                        <div className="mt-3 p-2 bg-blue-100 rounded-lg">
+                          <p className="text-xs text-blue-700 font-medium">This message requires your attention</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 ))}
-                {(!contactSubmissions || contactSubmissions.length === 0) && (
+                {contactSubmissions?.filter(submission => {
+                  const matchesSearch = !searchTerm || 
+                    submission.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    submission.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    submission.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    submission.message.toLowerCase().includes(searchTerm.toLowerCase());
+                  
+                  const matchesStatus = statusFilter === "all" || 
+                    (statusFilter === "unread" && !submission.isRead) ||
+                    (statusFilter === "read" && submission.isRead);
+                  
+                  return matchesSearch && matchesStatus;
+                }).length === 0 && (
                   <div className="text-center py-12">
                     <MessageSquare className="mx-auto text-slate-400 mb-4" size={48} />
-                    <p className="text-slate-500">No contact submissions yet.</p>
-                    <p className="text-slate-400 text-sm mt-1">Messages will appear here when visitors contact you.</p>
+                    {contactSubmissions?.length === 0 ? (
+                      <>
+                        <p className="text-slate-500">No contact submissions yet.</p>
+                        <p className="text-slate-400 text-sm mt-1">Messages will appear here when visitors contact you.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-slate-500">No messages match your search criteria.</p>
+                        <p className="text-slate-400 text-sm mt-1">Try adjusting your search or filters.</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
